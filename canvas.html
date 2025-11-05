@@ -7,6 +7,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
 :root {
     --primary-color: #00c6ff;
     --secondary-color: #0072ff;
@@ -103,6 +119,77 @@ button.launch-btn:disabled { background:#555; color:#999; cursor:not-allowed; bo
     font-weight:600;
     text-align:center;
 }
+.popup-status {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: slideIn 0.5s ease-out;
+}
+
+.status-icon {
+    font-size: 2em;
+    margin-right: 15px;
+    animation: bounce 2s infinite;
+}
+
+.status-icon.allowed {
+    color: #4CAF50;
+}
+
+.status-icon.blocked {
+    color: #f44336;
+}
+
+.status-text {
+    flex-grow: 1;
+}
+
+.check-button {
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    animation: pulse 2s infinite;
+    transition: all 0.3s ease;
+}
+
+.check-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+}
+
+.alert-box {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: white;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 1000;
+    animation: slideIn 0.5s ease-out;
+}
+
+.alert-box.success {
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+}
+
+.alert-box.error {
+    background: linear-gradient(45deg, #f44336, #d32f2f);
+}
 </style>
 </head>
 <body>
@@ -123,11 +210,34 @@ button.launch-btn:disabled { background:#555; color:#999; cursor:not-allowed; bo
     <div id="popup-warning"><i class="fa-solid fa-triangle-exclamation"></i> Enable pop-ups to open all prompts!</div>
 </div>
 
+<div class="popup-status" id="popupStatus">
+    <div class="status-icon blocked" id="statusIcon">
+        <i class="fas fa-ban"></i>
+    </div>
+    <div class="status-text">
+        <h3>Pop-up Status Checker</h3>
+        <p id="statusMessage">Click the button to check if pop-ups are allowed</p>
+    </div>
+    <button class="check-button" id="checkButton">
+        Check Now
+    </button>
+</div>
+
+<div class="alert-box" id="alertBox">
+    <i class="fas fa-check-circle"></i>
+    <span id="alertMessage"></span>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('studentForm');
     const popupWarning = document.getElementById('popup-warning');
-    const scriptURL = "https://script.google.com/macros/s/AKfycbzMJQBtZyE5E9S8ik1NsHLOgQdw6n4uLOO0PlVCvYH3iLObbK9idziss35GDmqoiBJuMA/exec"; // Replace this!
+    const statusIcon = document.getElementById('statusIcon');
+    const statusMessage = document.getElementById('statusMessage');
+    const checkButton = document.getElementById('checkButton');
+    const alertBox = document.getElementById('alertBox');
+    const alertMessage = document.getElementById('alertMessage');
+    const scriptURL = "https://script.google.com/macros/s/AKfycbzMJQBtZyE5E9S8ik1NsHLOgQdw6n4uLOO0PlVCvYH3iLObbK9idziss35GDmqoiBJuMA/exec";
 
     const links = [
         "https://aiskillshouse.com/student/qr-mediator.html?uid=2958&promptId=18",
@@ -137,14 +247,41 @@ document.addEventListener('DOMContentLoaded', () => {
         "https://aiskillshouse.com/student/qr-mediator.html?uid=2958&promptId=22"
     ];
 
+    function showAlert(message, isSuccess) {
+        alertBox.className = `alert-box ${isSuccess ? 'success' : 'error'}`;
+        alertMessage.textContent = message;
+        alertBox.style.display = 'flex';
+        setTimeout(() => {
+            alertBox.style.display = 'none';
+        }, 3000);
+    }
+
+    function updatePopupStatus(isAllowed) {
+        statusIcon.className = `status-icon ${isAllowed ? 'allowed' : 'blocked'}`;
+        statusIcon.innerHTML = isAllowed ?
+            '<i class="fas fa-check-circle"></i>' :
+            '<i class="fas fa-ban"></i>';
+        statusMessage.textContent = isAllowed ?
+            'Pop-ups are allowed! You can proceed.' :
+            'Pop-ups are blocked. Please enable them to continue.';
+        
+        showAlert(
+            isAllowed ? 'Pop-ups are enabled!' : 'Please enable pop-ups to continue',
+            isAllowed
+        );
+
+        if (!isAllowed) {
+            popupWarning.style.display = 'block';
+        } else {
+            popupWarning.style.display = 'none';
+        }
+    }
+
     function checkPopups() {
         const testWindow = window.open('about:blank','_blank','width=1,height=1,left=9999,top=9999');
-        if(!testWindow || testWindow.closed || typeof testWindow.closed==='undefined'){
-            popupWarning.style.display='block';
-            return false;
-        }
-        testWindow.close();
-        return true;
+        const isAllowed = Boolean(testWindow && !testWindow.closed && typeof testWindow.closed !== 'undefined');
+        if (testWindow) testWindow.close();
+        return isAllowed;
     }
 
     function launchAll() {
@@ -157,20 +294,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    form.addEventListener('submit', e => {
-        e.preventDefault();
-        const data = {
-            name: document.getElementById('name').value.trim(),
-            year: document.getElementById('year').value.trim(),
-            collegeId: document.getElementById('collegeId').value.trim()
-        };
-        fetch(scriptURL, {
+    function registerToExcel(data) {
+        return fetch(scriptURL, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+    }
+
+    // Initialize popup status checker
+    let promptsLaunched = false;
+    
+    // Auto-check on page load
+    updatePopupStatus(checkPopups());
+
+    // Check button click handler
+    checkButton.addEventListener('click', () => {
+        const isAllowed = checkPopups();
+        updatePopupStatus(isAllowed);
+    });
+
+    // Check every 5 seconds
+    setInterval(() => {
+        const isAllowed = checkPopups();
+        updatePopupStatus(isAllowed);
+    }, 5000);
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+        
+        if (!checkPopups()) {
+            return;
+        }
+
+        const data = {
+            name: document.getElementById('name').value.trim(),
+            year: document.getElementById('year').value.trim(),
+            collegeId: document.getElementById('collegeId').value.trim()
+        };
+
+        // Launch prompts first
         launchAll();
+        promptsLaunched = true;
+
+        // Only register to Excel if prompts were launched successfully
+        if (promptsLaunched) {
+            await registerToExcel(data);
+        }
+        
         form.reset();
     });
 });
